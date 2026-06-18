@@ -165,7 +165,6 @@ export function AgentControlBar({
   const {
     micTrackRef,
     cameraToggle,
-    microphoneToggle,
     screenShareToggle,
     handleAudioDeviceChange,
     handleVideoDeviceChange,
