@@ -1,6 +1,10 @@
-import { APP_CONFIG_DEFAULTS } from '@/app-config';
+import { headers } from 'next/headers';
 import { App } from '@/components/app/app';
+import { getAppConfig } from '@/lib/utils';
 
-export default function Page() {
-  return <App appConfig={APP_CONFIG_DEFAULTS} />;
+export default async function Page() {
+  const hdrs = await headers();
+  const appConfig = await getAppConfig(hdrs);
+
+  return <App appConfig={appConfig} />;
 }
