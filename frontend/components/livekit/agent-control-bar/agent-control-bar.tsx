@@ -30,13 +30,16 @@ export interface AgentControlBarProps extends UseInputControlsProps {
 }
 
 // Deep Searchのモード
+// 'off'        : 通常（RAG + 必要時Web検索）
+// 'oneshot'    : 次の1発話だけDeep Search → 自動OFF（点滅）
+// 'continuous' : 継続Deep SearchモードON（点灯）
 type DeepSearchMode = 'off' | 'oneshot' | 'continuous';
 
-const LONG_PRESS_MS = 500;
+const LONG_PRESS_MS = 500; // 長押し判定時間（ms）
 
 export function AgentControlBar({
   controls,
-  saveUserChoices = false,
+  saveUserChoices = false,  // localStorageから前回のマイク状態を復元しない
   className,
   isConnected = false,
   onDisconnect,
@@ -50,7 +53,7 @@ export function AgentControlBar({
   const [chatOpen, setChatOpen] = useState(false);
 
   // ── TTSミュート状態管理 ─────────────────────────────────────
-  const [ttsMuted, setTtsMuted] = useState(false);
+  const [ttsMuted, setTtsMuted] = useState(false); // デフォルトはミュートOFF（音声ON）
 
   const publishTtsMute = useCallback(async (muted: boolean) => {
     try {
@@ -64,7 +67,7 @@ export function AgentControlBar({
     }
   }, [localParticipant]);
 
-  // 接続確立時に初期ミュート状態をagentに送信
+  // 接続確立時に初期ミュート状態をagentに送信（2秒待ってagentのdata_receivedが準備完了するのを待つ）
   useEffect(() => {
     if (!isConnected || !localParticipant) return;
     const sendInitialMuteState = async () => {
@@ -86,6 +89,7 @@ export function AgentControlBar({
   // ── Deep Search 状態管理 ─────────────────────────────────────
   const [deepSearchMode, setDeepSearchMode] = useState<DeepSearchMode>('off');
 
+  // ── Deep Search 実行中状態（agentからのstart/endを受信） ──
   const room = useRoomContext();
   const [deepSearchRunning, setDeepSearchRunning] = useState(false);
   useEffect(() => {
@@ -98,6 +102,8 @@ export function AgentControlBar({
             setDeepSearchRunning(true);
           } else if (msg.status === 'end') {
             setDeepSearchRunning(false);
+            // oneshot は1回実行で消費 → agent 側の自動OFF に表示を同期
+            // continuous は維持（agent 側も継続のため戻さない）
             setDeepSearchMode((prev) => (prev === 'oneshot' ? 'off' : prev));
           }
         }
@@ -108,7 +114,6 @@ export function AgentControlBar({
     room.on('dataReceived', handleData);
     return () => { room.off('dataReceived', handleData); };
   }, [room]);
-
   const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLongPressRef = useRef(false);
 
@@ -124,10 +129,12 @@ export function AgentControlBar({
     }
   }, [localParticipant]);
 
+  // ポインター押下開始 → 長押しタイマー起動
   const handleDsPointerDown = useCallback(() => {
     isLongPressRef.current = false;
     pressTimerRef.current = setTimeout(() => {
       isLongPressRef.current = true;
+      // 長押し → 継続モードON（既にONならOFF）
       setDeepSearchMode(prev => {
         const next: DeepSearchMode = prev === 'continuous' ? 'off' : 'continuous';
         publishDeepSearch(next);
@@ -136,14 +143,16 @@ export function AgentControlBar({
     }, LONG_PRESS_MS);
   }, [publishDeepSearch]);
 
+  // ポインター離した → 短押し判定
   const handleDsPointerUp = useCallback(() => {
     if (pressTimerRef.current) {
       clearTimeout(pressTimerRef.current);
       pressTimerRef.current = null;
     }
     if (!isLongPressRef.current) {
+      // 短押し → oneshotモード（既にoneshotならOFF）
       setDeepSearchMode(prev => {
-        if (prev === 'continuous') return prev;
+        if (prev === 'continuous') return prev; // 継続中は短押し無視
         const next: DeepSearchMode = prev === 'oneshot' ? 'off' : 'oneshot';
         publishDeepSearch(next);
         return next;
@@ -293,6 +302,7 @@ export function AgentControlBar({
                 (deepSearchMode === 'oneshot' || deepSearchRunning) && 'animate-pulse',
               )}
             />
+            {/* Deep Search 実行中インジケータ（agentからstart/end受信） */}
             {deepSearchRunning && (
               <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-blue-400 animate-pulse" />
             )}
