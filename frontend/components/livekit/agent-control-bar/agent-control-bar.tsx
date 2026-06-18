@@ -1,9 +1,9 @@
 'use client';
 
-import { type HTMLAttributes, useCallback, useEffect, useState } from 'react';
+import { type HTMLAttributes, useCallback, useEffect, useRef, useState } from 'react';
 import { Track } from 'livekit-client';
-import { useChat, useLocalParticipant, useRemoteParticipants } from '@livekit/components-react';
-import { ChatTextIcon, PhoneDisconnectIcon, SpeakerSimpleXIcon, SpeakerSimpleHighIcon } from '@phosphor-icons/react/dist/ssr';
+import { useChat, useLocalParticipant, useRemoteParticipants, useRoomContext } from '@livekit/components-react';
+import { ChatTextIcon, PhoneDisconnectIcon, MagnifyingGlassIcon, SpeakerSimpleXIcon, SpeakerSimpleHighIcon } from '@phosphor-icons/react/dist/ssr';
 import { TrackToggle } from '@/components/livekit/agent-control-bar/track-toggle';
 import { Button } from '@/components/livekit/button';
 import { Toggle } from '@/components/livekit/toggle';
@@ -12,6 +12,7 @@ import { ChatInput } from './chat-input';
 import { UseInputControlsProps, useInputControls } from './hooks/use-input-controls';
 import { usePublishPermissions } from './hooks/use-publish-permissions';
 import { TrackSelector } from './track-selector';
+import { MicButton } from './MicButton';
 
 export interface ControlBarControls {
   leave?: boolean;
@@ -28,12 +29,14 @@ export interface AgentControlBarProps extends UseInputControlsProps {
   onDeviceError?: (error: { source: Track.Source; error: Error }) => void;
 }
 
-/**
- * A control bar specifically designed for voice assistant interfaces
- */
+// Deep Searchのモード
+type DeepSearchMode = 'off' | 'oneshot' | 'continuous';
+
+const LONG_PRESS_MS = 500;
+
 export function AgentControlBar({
   controls,
-  saveUserChoices = true,
+  saveUserChoices = false,
   className,
   isConnected = false,
   onDisconnect,
@@ -80,6 +83,75 @@ export function AgentControlBar({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConnected]);
 
+  // ── Deep Search 状態管理 ─────────────────────────────────────
+  const [deepSearchMode, setDeepSearchMode] = useState<DeepSearchMode>('off');
+
+  const room = useRoomContext();
+  const [deepSearchRunning, setDeepSearchRunning] = useState(false);
+  useEffect(() => {
+    if (!room) return;
+    const handleData = (payload: Uint8Array) => {
+      try {
+        const msg = JSON.parse(new TextDecoder().decode(payload));
+        if (msg.type === 'deep_search_status') {
+          if (msg.status === 'start') {
+            setDeepSearchRunning(true);
+          } else if (msg.status === 'end') {
+            setDeepSearchRunning(false);
+            setDeepSearchMode((prev) => (prev === 'oneshot' ? 'off' : prev));
+          }
+        }
+      } catch {
+        // 無視
+      }
+    };
+    room.on('dataReceived', handleData);
+    return () => { room.off('dataReceived', handleData); };
+  }, [room]);
+
+  const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isLongPressRef = useRef(false);
+
+  const publishDeepSearch = useCallback(async (mode: DeepSearchMode) => {
+    try {
+      const payload = JSON.stringify({ type: 'deep_search', mode });
+      await localParticipant.publishData(
+        new TextEncoder().encode(payload),
+        { reliable: true }
+      );
+    } catch (e) {
+      console.error('Deep Search publish failed:', e);
+    }
+  }, [localParticipant]);
+
+  const handleDsPointerDown = useCallback(() => {
+    isLongPressRef.current = false;
+    pressTimerRef.current = setTimeout(() => {
+      isLongPressRef.current = true;
+      setDeepSearchMode(prev => {
+        const next: DeepSearchMode = prev === 'continuous' ? 'off' : 'continuous';
+        publishDeepSearch(next);
+        return next;
+      });
+    }, LONG_PRESS_MS);
+  }, [publishDeepSearch]);
+
+  const handleDsPointerUp = useCallback(() => {
+    if (pressTimerRef.current) {
+      clearTimeout(pressTimerRef.current);
+      pressTimerRef.current = null;
+    }
+    if (!isLongPressRef.current) {
+      setDeepSearchMode(prev => {
+        if (prev === 'continuous') return prev;
+        const next: DeepSearchMode = prev === 'oneshot' ? 'off' : 'oneshot';
+        publishDeepSearch(next);
+        return next;
+      });
+    }
+    isLongPressRef.current = false;
+  }, [publishDeepSearch]);
+
   const publishPermissions = usePublishPermissions();
   const {
     micTrackRef,
@@ -114,6 +186,11 @@ export function AgentControlBar({
 
   const isAgentAvailable = participants.some((p) => p.isAgent);
 
+  const deepSearchTitle =
+    deepSearchMode === 'continuous' ? 'Deep Search 継続ON（長押しでOFF）' :
+    deepSearchMode === 'oneshot'    ? 'Deep Search 1回待機中（タップでキャンセル）' :
+    'Deep Search（短押し：1回 / 長押し：継続）';
+
   return (
     <div
       aria-label="Voice assistant controls"
@@ -136,17 +213,7 @@ export function AgentControlBar({
         <div className="flex grow gap-1">
           {/* Toggle Microphone */}
           {visibleControls.microphone && (
-            <TrackSelector
-              kind="audioinput"
-              aria-label="Toggle microphone"
-              source={Track.Source.Microphone}
-              pressed={microphoneToggle.enabled}
-              disabled={microphoneToggle.pending}
-              audioTrackRef={micTrackRef}
-              onPressedChange={microphoneToggle.toggle}
-              onMediaDeviceError={handleMicrophoneDeviceSelectError}
-              onActiveDeviceChange={handleAudioDeviceChange}
-            />
+            <MicButton />
           )}
 
           {/* Toggle Camera */}
@@ -161,6 +228,7 @@ export function AgentControlBar({
               onPressedChange={cameraToggle.toggle}
               onMediaDeviceError={handleCameraDeviceSelectError}
               onActiveDeviceChange={handleVideoDeviceChange}
+              className="[&_button:first-child]:h-9 [&_button:first-child]:w-9 [&_button:first-child]:rounded-full [&_button:last-child]:h-9"
             />
           )}
 
@@ -174,6 +242,7 @@ export function AgentControlBar({
               pressed={screenShareToggle.enabled}
               disabled={screenShareToggle.pending}
               onPressedChange={screenShareToggle.toggle}
+              className="h-9 w-9 rounded-full"
             />
           )}
 
@@ -188,12 +257,46 @@ export function AgentControlBar({
               setTtsMuted(!on);
               publishTtsMute(!on);
             }}
+            className="h-9 w-9 rounded-full"
           >
             {ttsMuted
               ? <SpeakerSimpleXIcon weight="bold" />
               : <SpeakerSimpleHighIcon weight="bold" />
             }
           </Toggle>
+
+          {/* Deep Search ボタン（短押し=1shot / 長押し=継続） */}
+          <button
+            type="button"
+            aria-label="Deep Search"
+            title={deepSearchTitle}
+            onPointerDown={handleDsPointerDown}
+            onPointerUp={handleDsPointerUp}
+            onPointerLeave={() => {
+              if (pressTimerRef.current) {
+                clearTimeout(pressTimerRef.current);
+                pressTimerRef.current = null;
+              }
+              isLongPressRef.current = false;
+            }}
+            className={cn(
+              'relative flex h-9 w-9 items-center justify-center rounded-full transition-all duration-200 select-none',
+              deepSearchMode === 'continuous' && 'bg-primary text-primary-foreground hover:bg-primary/90 ring-2 ring-primary/30',
+              deepSearchMode === 'oneshot'    && 'bg-muted text-primary hover:bg-muted/80 ring-2 ring-primary/30',
+              deepSearchMode === 'off'        && 'bg-muted text-foreground hover:bg-muted/80',
+            )}
+          >
+            <MagnifyingGlassIcon
+              weight="bold"
+              className={cn(
+                'h-4 w-4 transition-all duration-300',
+                (deepSearchMode === 'oneshot' || deepSearchRunning) && 'animate-pulse',
+              )}
+            />
+            {deepSearchRunning && (
+              <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-blue-400 animate-pulse" />
+            )}
+          </button>
 
           {/* Toggle Transcript */}
           <Toggle
@@ -202,6 +305,7 @@ export function AgentControlBar({
             aria-label="Toggle transcript"
             pressed={chatOpen}
             onPressedChange={handleToggleTranscript}
+            className="h-9 w-9 rounded-full"
           >
             <ChatTextIcon weight="bold" />
           </Toggle>
