@@ -23,6 +23,12 @@ const MOTION_PROPS = {
   },
 };
 
+interface ChatInputProps {
+  chatOpen: boolean;
+  isAgentAvailable?: boolean;
+  onSend?: (message: string) => void;
+}
+
 // ── URL保存検知 ────────────────────────────────────────────────
 
 /** メッセージ中のURLを抽出する */
@@ -66,12 +72,6 @@ async function saveUrlToRag(url: string): Promise<void> {
 }
 
 // ── コンポーネント ──────────────────────────────────────────────
-
-interface ChatInputProps {
-  chatOpen: boolean;
-  isAgentAvailable?: boolean;
-  onSend?: (message: string) => void;
-}
 
 export function ChatInput({
   chatOpen,
