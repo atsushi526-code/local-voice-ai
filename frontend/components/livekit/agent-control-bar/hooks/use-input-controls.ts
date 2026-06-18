@@ -15,7 +15,6 @@ export interface UseInputControlsProps {
 
 export interface UseInputControlsReturn {
   micTrackRef: TrackReferenceOrPlaceholder;
-  microphoneToggle: ReturnType<typeof useTrackToggle<Track.Source.Microphone>>;
   cameraToggle: ReturnType<typeof useTrackToggle<Track.Source.Camera>>;
   screenShareToggle: ReturnType<typeof useTrackToggle<Track.Source.ScreenShare>>;
   handleAudioDeviceChange: (deviceId: string) => void;
@@ -29,11 +28,6 @@ export function useInputControls({
   onDeviceError,
 }: UseInputControlsProps = {}): UseInputControlsReturn {
   const { microphoneTrack, localParticipant } = useLocalParticipant();
-
-  const microphoneToggle = useTrackToggle({
-    source: Track.Source.Microphone,
-    onDeviceError: (error) => onDeviceError?.({ source: Track.Source.Microphone, error }),
-  });
 
   const cameraToggle = useTrackToggle({
     source: Track.Source.Camera,
@@ -54,7 +48,6 @@ export function useInputControls({
   }, [localParticipant, microphoneTrack]);
 
   const {
-    saveAudioInputEnabled,
     saveVideoInputEnabled,
     saveAudioInputDeviceId,
     saveVideoInputDeviceId,
@@ -86,15 +79,6 @@ export function useInputControls({
     [cameraToggle, screenShareToggle, saveVideoInputEnabled]
   );
 
-  const handleToggleMicrophone = useCallback(
-    async (enabled?: boolean) => {
-      await microphoneToggle.toggle(enabled);
-      // persist audio input enabled preference
-      saveAudioInputEnabled(!microphoneToggle.enabled);
-    },
-    [microphoneToggle, saveAudioInputEnabled]
-  );
-
   const handleToggleScreenShare = useCallback(
     async (enabled?: boolean) => {
       if (cameraToggle.enabled) {
@@ -119,10 +103,6 @@ export function useInputControls({
     cameraToggle: {
       ...cameraToggle,
       toggle: handleToggleCamera,
-    },
-    microphoneToggle: {
-      ...microphoneToggle,
-      toggle: handleToggleMicrophone,
     },
     screenShareToggle: {
       ...screenShareToggle,
