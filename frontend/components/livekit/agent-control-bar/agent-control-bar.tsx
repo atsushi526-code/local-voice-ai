@@ -1,9 +1,9 @@
 'use client';
 
-import { type HTMLAttributes, useCallback, useState } from 'react';
+import { type HTMLAttributes, useCallback, useEffect, useState } from 'react';
 import { Track } from 'livekit-client';
-import { useChat, useRemoteParticipants } from '@livekit/components-react';
-import { ChatTextIcon, PhoneDisconnectIcon } from '@phosphor-icons/react/dist/ssr';
+import { useChat, useLocalParticipant, useRemoteParticipants } from '@livekit/components-react';
+import { ChatTextIcon, PhoneDisconnectIcon, SpeakerSimpleXIcon, SpeakerSimpleHighIcon } from '@phosphor-icons/react/dist/ssr';
 import { TrackToggle } from '@/components/livekit/agent-control-bar/track-toggle';
 import { Button } from '@/components/livekit/button';
 import { Toggle } from '@/components/livekit/toggle';
@@ -42,8 +42,44 @@ export function AgentControlBar({
   ...props
 }: AgentControlBarProps & HTMLAttributes<HTMLDivElement>) {
   const { send } = useChat();
+  const { localParticipant } = useLocalParticipant();
   const participants = useRemoteParticipants();
   const [chatOpen, setChatOpen] = useState(false);
+
+  // ── TTSミュート状態管理 ─────────────────────────────────────
+  const [ttsMuted, setTtsMuted] = useState(false);
+
+  const publishTtsMute = useCallback(async (muted: boolean) => {
+    try {
+      const payload = JSON.stringify({ type: 'tts_mute', muted });
+      await localParticipant.publishData(
+        new TextEncoder().encode(payload),
+        { reliable: true }
+      );
+    } catch (e) {
+      console.error('TTS mute publish failed:', e);
+    }
+  }, [localParticipant]);
+
+  // 接続確立時に初期ミュート状態をagentに送信
+  useEffect(() => {
+    if (!isConnected || !localParticipant) return;
+    const sendInitialMuteState = async () => {
+      await new Promise(r => setTimeout(r, 2000));
+      try {
+        const payload = JSON.stringify({ type: 'tts_mute', muted: ttsMuted });
+        await localParticipant.publishData(
+          new TextEncoder().encode(payload),
+          { reliable: true }
+        );
+      } catch (e) {
+        console.warn('初期TTS mute送信失敗:', e);
+      }
+    };
+    sendInitialMuteState();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConnected]);
+
   const publishPermissions = usePublishPermissions();
   const {
     micTrackRef,
@@ -140,6 +176,24 @@ export function AgentControlBar({
               onPressedChange={screenShareToggle.toggle}
             />
           )}
+
+          {/* TTSミュートボタン（音声ON/OFF） */}
+          <Toggle
+            size="icon"
+            variant="secondary"
+            aria-label={ttsMuted ? '音声をONにする' : '音声をOFFにする'}
+            title={ttsMuted ? '音声OFF中（タップでON）' : '音声ON中（タップでOFF）'}
+            pressed={!ttsMuted}
+            onPressedChange={(on) => {
+              setTtsMuted(!on);
+              publishTtsMute(!on);
+            }}
+          >
+            {ttsMuted
+              ? <SpeakerSimpleXIcon weight="bold" />
+              : <SpeakerSimpleHighIcon weight="bold" />
+            }
+          </Toggle>
 
           {/* Toggle Transcript */}
           <Toggle
