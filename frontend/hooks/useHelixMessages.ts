@@ -16,6 +16,7 @@ export interface HelixMessage {
 }
 
 const TOPIC = 'helix.chat';
+const CONTROL_TOPIC = 'helix.control';
 
 /**
  * 統一メッセージストリーム(helix.chat)の購読。
@@ -115,10 +116,33 @@ export function useHelixMessages(room?: Room): {
         ]);
       }
     };
+    // ── helix.control: New Chat の reset 完了通知 → 会話ペインを完全クリア ──
+    const controlHandler = async (reader: any) => {
+      try {
+        const raw = await reader.readAll();
+        const msg = JSON.parse(raw) as { type?: string };
+        if (msg.type === 'reset_done') {
+          deltaBufRef.current.clear();
+          finalizedIdsRef.current.clear();
+          partsBufRef.current.clear();
+          setStreaming(false);
+          setMessages([]);
+        }
+      } catch (e) {
+        console.error('helix.control parse failed:', e);
+      }
+    };
+
     room.registerTextStreamHandler(TOPIC, handler);
+    room.registerTextStreamHandler(CONTROL_TOPIC, controlHandler);
     return () => {
       try {
         room.unregisterTextStreamHandler(TOPIC);
+      } catch {
+        /* already unregistered */
+      }
+      try {
+        room.unregisterTextStreamHandler(CONTROL_TOPIC);
       } catch {
         /* already unregistered */
       }

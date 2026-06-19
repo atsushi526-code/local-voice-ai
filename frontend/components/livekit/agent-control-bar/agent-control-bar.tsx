@@ -3,7 +3,7 @@
 import { type HTMLAttributes, useCallback, useEffect, useRef, useState } from 'react';
 import { Track } from 'livekit-client';
 import { useChat, useLocalParticipant, useRemoteParticipants, useRoomContext } from '@livekit/components-react';
-import { ChatTextIcon, PhoneDisconnectIcon, MagnifyingGlassIcon, SpeakerSimpleXIcon, SpeakerSimpleHighIcon } from '@phosphor-icons/react/dist/ssr';
+import { ChatTextIcon, MagnifyingGlassIcon, SpeakerSimpleXIcon, SpeakerSimpleHighIcon } from '@phosphor-icons/react/dist/ssr';
 import { TrackToggle } from '@/components/livekit/agent-control-bar/track-toggle';
 import { Button } from '@/components/livekit/button';
 import { Toggle } from '@/components/livekit/toggle';
@@ -64,6 +64,19 @@ export function AgentControlBar({
       );
     } catch (e) {
       console.error('TTS mute publish failed:', e);
+    }
+  }, [localParticipant]);
+
+  // ── New Chat: セッションリセット送信（room切断はしない） ──────────
+  const publishResetSession = useCallback(async () => {
+    try {
+      const payload = JSON.stringify({ type: 'reset_session' });
+      await localParticipant.publishData(
+        new TextEncoder().encode(payload),
+        { reliable: true }
+      );
+    } catch (e) {
+      console.error('reset_session publish failed:', e);
     }
   }, [localParticipant]);
 
@@ -320,17 +333,17 @@ export function AgentControlBar({
           </Toggle>
         </div>
 
-        {/* Disconnect */}
+        {/* New Chat（セッションリセット。room切断はしない） */}
         {visibleControls.leave && (
           <Button
-            variant="destructive"
-            onClick={onDisconnect}
+            variant="secondary"
+            onClick={publishResetSession}
             disabled={!isConnected}
             className="font-mono"
           >
-            <PhoneDisconnectIcon weight="bold" />
-            <span className="hidden md:inline">END CALL</span>
-            <span className="inline md:hidden">END</span>
+            <ChatTextIcon weight="bold" />
+            <span className="hidden md:inline">New Chat</span>
+            <span className="inline md:hidden">New</span>
           </Button>
         )}
       </div>
