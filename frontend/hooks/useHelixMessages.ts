@@ -116,26 +116,40 @@ export function useHelixMessages(room?: Room): {
         ]);
       }
     };
-    // ── helix.control: New Chat の reset 完了通知 → 会話ペインを完全クリア ──
+    // ── 会話ペインを完全クリアする共通処理（reset_done受信／New Chat即時クリアの両方で使用） ──
+    const clearConversation = () => {
+      deltaBufRef.current.clear();
+      finalizedIdsRef.current.clear();
+      partsBufRef.current.clear();
+      setStreaming(false);
+      setMessages([]);
+    };
+
+    // ── helix.control: New Chat の reset 完了通知（確認用の保険。楽観クリア後の再確定） ──
     const controlHandler = async (reader: any) => {
       try {
         const raw = await reader.readAll();
         const msg = JSON.parse(raw) as { type?: string };
         if (msg.type === 'reset_done') {
-          deltaBufRef.current.clear();
-          finalizedIdsRef.current.clear();
-          partsBufRef.current.clear();
-          setStreaming(false);
-          setMessages([]);
+          clearConversation();
         }
       } catch (e) {
         console.error('helix.control parse failed:', e);
       }
     };
 
+    // ── New Chat 押下時の楽観的クリア（backendのreset完了を待たず即時。control-barからdispatch） ──
+    const onNewChat = () => clearConversation();
+    if (typeof window !== 'undefined') {
+      window.addEventListener('helix:new-chat', onNewChat);
+    }
+
     room.registerTextStreamHandler(TOPIC, handler);
     room.registerTextStreamHandler(CONTROL_TOPIC, controlHandler);
     return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('helix:new-chat', onNewChat);
+      }
       try {
         room.unregisterTextStreamHandler(TOPIC);
       } catch {

@@ -69,6 +69,11 @@ export function AgentControlBar({
 
   // ── New Chat: セッションリセット送信（room切断はしない） ──────────
   const publishResetSession = useCallback(async () => {
+    // 楽観的UIクリア: backendのreset完了(reset_done)を待たず会話ペインを即クリアする。
+    // reset_doneは確認用の保険として残す（engine切断でreset_doneを取りこぼしてもUIは消える）。
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('helix:new-chat'));
+    }
     try {
       const payload = JSON.stringify({ type: 'reset_session' });
       await localParticipant.publishData(
