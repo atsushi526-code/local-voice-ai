@@ -13,6 +13,7 @@ import { ViewController } from '@/components/app/view-controller';
 import { Toaster } from '@/components/livekit/toaster';
 import { useAgentErrors } from '@/hooks/useAgentErrors';
 import { useDebugMode } from '@/hooks/useDebug';
+import { useLeaveBeacon } from '@/hooks/useLeaveBeacon';
 import { getSandboxTokenSource } from '@/lib/utils';
 
 const IN_DEVELOPMENT = process.env.NODE_ENV !== 'production';
@@ -20,6 +21,7 @@ const IN_DEVELOPMENT = process.env.NODE_ENV !== 'production';
 function AppSetup() {
   useDebugMode({ enabled: IN_DEVELOPMENT });
   useAgentErrors();
+  useLeaveBeacon();
 
   return null;
 }
