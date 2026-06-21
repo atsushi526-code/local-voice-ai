@@ -1,9 +1,11 @@
 'use client';
 
+import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { AppConfig } from '@/app-config';
 import { App } from '@/components/app/app';
 import { Sidebar } from '@/components/sidebar/sidebar';
+import { HistoryOverlay } from '@/components/history/history-overlay';
 
 interface ChatWorkspaceProps {
   appConfig: AppConfig;
@@ -26,9 +28,17 @@ interface ChatWorkspaceProps {
  *   App/session-view 自体は無改変（最小変更）。
  */
 export function ChatWorkspace({ appConfig }: ChatWorkspaceProps) {
+  const [historyId, setHistoryId] = useState<string | null>(null);
+  const closeHistory = useCallback(() => setHistoryId(null), []);
+  // App は historyId トグルで再render/再生成させない（要素参照を固定）。
+  const appEl = useMemo(() => <App appConfig={appConfig} />, [appConfig]);
+
   return (
     <div className="flex h-svh w-full overflow-hidden">
-      <Sidebar className="hidden md:flex md:w-[300px] md:shrink-0 md:border-r md:border-border" />
+      <Sidebar
+        className="hidden md:flex md:w-[300px] md:shrink-0 md:border-r md:border-border"
+        onSelectHistory={setHistoryId}
+      />
 
       {/* モバイル用 履歴/RAG 導線（md 未満のみ。サイドバー非表示の代替）。既存ルートへ遷移。 */}
       <nav className="fixed top-0 right-0 z-50 flex gap-3 p-3 md:hidden">
@@ -46,8 +56,9 @@ export function ChatWorkspace({ appConfig }: ChatWorkspaceProps) {
         </Link>
       </nav>
 
-      <div className="min-w-0 flex-1 [transform:translateZ(0)]">
-        <App appConfig={appConfig} />
+      <div className="relative min-w-0 flex-1 [transform:translateZ(0)]">
+        {appEl}
+        {historyId && <HistoryOverlay sessionId={historyId} onClose={closeHistory} />}
       </div>
     </div>
   );

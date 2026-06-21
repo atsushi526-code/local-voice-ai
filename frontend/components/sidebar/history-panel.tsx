@@ -31,7 +31,7 @@ function formatDate(iso: string) {
  * /history ページのコア（fetch + list + delete）を縮約。詳細は既存 /history/[id] へ遷移。
  * NOTE(v1): fetch ロジックは /history ページと一部重複（hook 共通化は後続PR）。
  */
-export function HistoryPanel() {
+export function HistoryPanel({ onSelectHistory }: { onSelectHistory?: (id: string) => void }) {
   const { data: session } = useSession();
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,9 +95,10 @@ export function HistoryPanel() {
         <ul className="space-y-1">
           {sessions.map((s) => (
             <li key={s.id} className="flex items-stretch gap-1">
-              <Link
-                href={`/history/${s.id}`}
-                className="block min-w-0 flex-1 rounded border border-border px-2 py-1.5 transition-colors hover:bg-muted"
+              <button
+                type="button"
+                onClick={() => onSelectHistory?.(s.id)}
+                className="block min-w-0 flex-1 rounded border border-border px-2 py-1.5 text-left transition-colors hover:bg-muted"
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate font-mono text-xs">{s.title}</span>
@@ -105,7 +106,7 @@ export function HistoryPanel() {
                     {formatDate(s.last_message_at)}
                   </span>
                 </div>
-              </Link>
+              </button>
               <button
                 onClick={() => deleteSession(s.id, s.title)}
                 aria-label="削除"
