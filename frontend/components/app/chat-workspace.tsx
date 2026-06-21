@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import type { AppConfig } from '@/app-config';
 import { App } from '@/components/app/app';
@@ -9,6 +9,7 @@ import { HistoryOverlay } from '@/components/history/history-overlay';
 
 interface ChatWorkspaceProps {
   appConfig: AppConfig;
+  accountSlot?: ReactNode;
 }
 
 /**
@@ -27,7 +28,7 @@ interface ChatWorkspaceProps {
  *   チャットの fixed 要素が右ペイン内に閉じ込められる → サイドバーがクリック可能・コントロールバーもペイン内に収まる。
  *   App/session-view 自体は無改変（最小変更）。
  */
-export function ChatWorkspace({ appConfig }: ChatWorkspaceProps) {
+export function ChatWorkspace({ appConfig, accountSlot }: ChatWorkspaceProps) {
   const [historyId, setHistoryId] = useState<string | null>(null);
   const closeHistory = useCallback(() => setHistoryId(null), []);
   // App は historyId トグルで再render/再生成させない（要素参照を固定）。
@@ -38,6 +39,7 @@ export function ChatWorkspace({ appConfig }: ChatWorkspaceProps) {
       <Sidebar
         className="hidden md:flex md:w-[300px] md:shrink-0 md:border-r md:border-border"
         onSelectHistory={setHistoryId}
+        accountSlot={accountSlot}
       />
 
       {/* モバイル用 履歴/RAG 導線（md 未満のみ。サイドバー非表示の代替）。既存ルートへ遷移。 */}

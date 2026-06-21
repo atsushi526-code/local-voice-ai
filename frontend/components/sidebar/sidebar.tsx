@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { HistoryPanel } from '@/components/sidebar/history-panel';
 import { RagPanel } from '@/components/sidebar/rag-panel';
 
@@ -11,9 +12,11 @@ import { RagPanel } from '@/components/sidebar/rag-panel';
 export function Sidebar({
   className = '',
   onSelectHistory,
+  accountSlot,
 }: {
   className?: string;
   onSelectHistory?: (id: string) => void;
+  accountSlot?: ReactNode;
 }) {
   return (
     <aside className={`h-svh flex-col bg-background ${className}`}>
@@ -25,6 +28,8 @@ export function Sidebar({
       <div className="max-h-[45%] min-h-0 overflow-y-auto border-t border-border">
         <RagPanel />
       </div>
+      {/* footer: アカウント（常時DOM維持・空でも存在）。accountSlot に Server Component を流し込み */}
+      <div className="shrink-0 border-t border-border">{accountSlot}</div>
     </aside>
   );
 }
