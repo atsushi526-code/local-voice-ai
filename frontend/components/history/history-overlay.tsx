@@ -32,7 +32,7 @@ export function HistoryOverlay({ sessionId, onClose }: HistoryOverlayProps) {
       key={sessionId}
       role="dialog"
       aria-modal="true"
-      className="absolute inset-0 z-40 overflow-y-auto bg-background p-6 pt-12"
+      className="absolute inset-0 z-[60] overflow-y-auto bg-background p-6 pt-20"
     >
       <HistoryDetail sessionId={sessionId} onClose={onClose} />
     </div>
