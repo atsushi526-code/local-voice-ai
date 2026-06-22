@@ -25,6 +25,7 @@ export interface ControlBarControls {
 export interface AgentControlBarProps extends UseInputControlsProps {
   controls?: ControlBarControls;
   isConnected?: boolean;
+  chatOpen?: boolean; // 外部controlled（任意・未指定時は内部state）
   onChatOpenChange?: (open: boolean) => void;
   onDeviceError?: (error: { source: Track.Source; error: Error }) => void;
 }
@@ -42,6 +43,7 @@ export function AgentControlBar({
   saveUserChoices = false,  // localStorageから前回のマイク状態を復元しない
   className,
   isConnected = false,
+  chatOpen: controlledChatOpen,
   onDisconnect,
   onDeviceError,
   onChatOpenChange,
@@ -50,7 +52,8 @@ export function AgentControlBar({
   const { send } = useChat();
   const { localParticipant } = useLocalParticipant();
   const participants = useRemoteParticipants();
-  const [chatOpen, setChatOpen] = useState(false);
+  const [internalChatOpen, setInternalChatOpen] = useState(false);
+  const chatOpen = controlledChatOpen ?? internalChatOpen; // controlled優先・非破壊hybrid
 
   // ── TTSミュート状態管理 ─────────────────────────────────────
   const [ttsMuted, setTtsMuted] = useState(false); // デフォルトはミュートOFF（音声ON）
@@ -196,10 +199,10 @@ export function AgentControlBar({
 
   const handleToggleTranscript = useCallback(
     (open: boolean) => {
-      setChatOpen(open);
+      setInternalChatOpen(open);
       onChatOpenChange?.(open);
     },
-    [onChatOpenChange, setChatOpen]
+    [onChatOpenChange, setInternalChatOpen]
   );
 
   const visibleControls = {

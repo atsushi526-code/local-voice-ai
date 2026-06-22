@@ -205,3 +205,8 @@
 .helix-prose table { border-collapse: collapse; margin: 0.8em 0; }
 .helix-prose th,
 .helix-prose td { border: 1px solid color-mix(in srgb, currentColor 20%, transparent); padding: 0.4em 0.7em; }
+
+/* PR3: transcript toggle を wrapper スコープで DOM 非表示（内部不変・presentation のみ） */
+.helix-controlbar [aria-label='Toggle transcript'] {
+  display: none;
+}
