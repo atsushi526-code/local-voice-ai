@@ -1,10 +1,11 @@
 'use client';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { useSessionContext, useLocalParticipant, useIsSpeaking, useVoiceAssistant, BarVisualizer } from '@livekit/components-react';
 
 import { useHelixMessages } from '@/hooks/useHelixMessages';
 import { useDeepSearchStatus } from '@/hooks/useDeepSearchStatus';
+import { useAutoScroll } from '@/hooks/useAutoScroll';
 import type { AppConfig } from '@/app-config';
 import { ChatTranscript, type StatusIndicator } from '@/components/app/chat-transcript';
 import { PreConnectMessage } from '@/components/app/preconnect-message';
@@ -77,7 +78,6 @@ export const SessionView = ({
   const { state: agentState, audioTrack } = useVoiceAssistant();
   const deepSearching = useDeepSearchStatus(session?.room);
   const [chatOpen, setChatOpen] = useState(true);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const controls: ControlBarControls = {
     leave: true,
@@ -96,27 +96,7 @@ export const SessionView = ({
     return null;
   })();
 
-  // 新しいメッセージが来たら最下部へスクロール
-  useEffect(() => {
-    const el = scrollAreaRef.current;
-    if (!el) return;
-    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
-    const lastMessage = messages.at(-1);
-    const lastMessageIsLocal = lastMessage?.role === 'user';
-    if (lastMessageIsLocal || isNearBottom) {
-      el.scrollTop = el.scrollHeight;
-    }
-  }, [messages]);
-
-  // インジケータ変化時も自動スクロール（末尾付近のときのみ）
-  useEffect(() => {
-    const el = scrollAreaRef.current;
-    if (!el || !statusIndicator) return;
-    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
-    if (isNearBottom) {
-      el.scrollTop = el.scrollHeight;
-    }
-  }, [statusIndicator]);
+  const scrollAreaRef = useAutoScroll(messages, statusIndicator);
 
   return (
     <section className="bg-background relative z-10 h-full w-full overflow-hidden" {...props}>
