@@ -32,16 +32,18 @@ function formatDate(iso: string) {
  * NOTE(v1): fetch ロジックは /history ページと一部重複（hook 共通化は後続PR）。
  */
 export function HistoryPanel({ onSelectHistory }: { onSelectHistory?: (id: string) => void }) {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  const accessToken = (session as any)?.access_token as string | undefined;
+  const sessionError = (session as any)?.error as string | undefined;
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!session) return;
+    if (status !== 'authenticated' || sessionError || !accessToken) return;
     fetchSessions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
+  }, [accessToken, status, sessionError]);
 
   async function fetchSessions() {
     setLoading(true);

@@ -1,7 +1,7 @@
 'use client';
 
 import { useSession, signIn } from 'next-auth/react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 /**
  * - トークン期限60秒前に自動リフレッシュ（先読み更新）
@@ -11,12 +11,17 @@ import { useEffect } from 'react';
 export function SessionErrorHandler() {
   const { data: session, update } = useSession();
 
-  // エラー時: 再ログイン
+  // エラー時: 再ログイン（多重発火ガード）
+  const signInTriggeredRef = useRef(false);
   useEffect(() => {
     if ((session as any)?.error === 'RefreshAccessTokenError') {
+      if (signInTriggeredRef.current) return;
+      signInTriggeredRef.current = true;
       signIn('keycloak');
+    } else if (!(session as any)?.error) {
+      signInTriggeredRef.current = false;
     }
-  }, [session]);
+  }, [(session as any)?.error]);
 
   // 先読みリフレッシュ: 期限60秒前に update() を呼ぶ
   useEffect(() => {
