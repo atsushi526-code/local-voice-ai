@@ -32,14 +32,16 @@ interface HistoryDetailProps {
  * 詳細は必要時のみ取得し、アンマウントで破棄（常駐キャッシュ・先読みなし）。
  */
 export function HistoryDetail({ sessionId, onClose }: HistoryDetailProps) {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  const accessToken = (session as any)?.access_token as string | undefined;
+  const sessionError = (session as any)?.error as string | undefined;
   const [meta, setMeta] = useState<SessionMeta | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!session || !sessionId) return;
+    if (status !== 'authenticated' || sessionError || !accessToken || !sessionId) return;
     let aborted = false;
     (async () => {
       setLoading(true);
@@ -47,7 +49,7 @@ export function HistoryDetail({ sessionId, onClose }: HistoryDetailProps) {
       try {
         const res = await fetch(
           `${process.env.NEXT_PUBLIC_API_URL}/history/sessions/${sessionId}`,
-          { headers: { Authorization: `Bearer ${(session as any)?.access_token ?? ''}` } }
+          { headers: { Authorization: `Bearer ${accessToken}` } }
         );
         if (!res.ok) throw new Error(`エラー: ${res.status}`);
         const data = await res.json();
@@ -63,7 +65,7 @@ export function HistoryDetail({ sessionId, onClose }: HistoryDetailProps) {
     return () => {
       aborted = true;
     };
-  }, [session, sessionId]);
+  }, [accessToken, status, sessionError, sessionId]);
 
   return (
     <div className="mx-auto max-w-3xl">

@@ -15,7 +15,9 @@ type SessionItem = {
 };
 
 export default function HistoryPage() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  const accessToken = (session as any)?.access_token as string | undefined;
+  const sessionError = (session as any)?.error as string | undefined;
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -23,9 +25,9 @@ export default function HistoryPage() {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    if (!session) return;
+    if (status !== 'authenticated' || sessionError || !accessToken) return;
     fetchSessions();
-  }, [session]);
+  }, [accessToken, status, sessionError]);
 
   async function fetchSessions() {
     setLoading(true);

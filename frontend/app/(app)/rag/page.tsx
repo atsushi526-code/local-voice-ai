@@ -19,7 +19,9 @@ function formatBytes(bytes: number) {
 }
 
 export default function RagPage() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  const accessToken = (session as any)?.access_token as string | undefined;
+  const sessionError = (session as any)?.error as string | undefined;
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -28,9 +30,9 @@ export default function RagPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!session) return;
+    if (status !== 'authenticated' || sessionError || !accessToken) return;
     fetchDocuments();
-  }, [session]);
+  }, [accessToken, status, sessionError]);
 
   async function fetchDocuments() {
     setLoading(true);
