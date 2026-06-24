@@ -1,6 +1,6 @@
 'use client';
 import React, { useState } from 'react';
-import { useSessionContext, useLocalParticipant, useIsSpeaking, useVoiceAssistant, BarVisualizer } from '@livekit/components-react';
+import { useSessionContext, useLocalParticipant, useIsSpeaking, useVoiceAssistant } from '@livekit/components-react';
 
 import { useHelixMessages } from '@/hooks/useHelixMessages';
 import { useDeepSearchStatus } from '@/hooks/useDeepSearchStatus';
@@ -9,10 +9,7 @@ import type { AppConfig } from '@/app-config';
 import { ChatTranscript, type StatusIndicator } from '@/components/app/chat-transcript';
 import { PreConnectMessage } from '@/components/app/preconnect-message';
 import { Fade, MotionBottom, BOTTOM_VIEW_MOTION_PROPS } from '@/components/app/fade';
-import {
-  AgentControlBar,
-  type ControlBarControls,
-} from '@/components/livekit/agent-control-bar/agent-control-bar';
+import { SessionInputBar } from '@/components/app/session-input-bar';
 import { cn } from '@/lib/utils';
 import { deriveStatusIndicator } from '@/lib/status-indicator';
 import { ScrollArea } from '../livekit/scroll-area/scroll-area';
@@ -32,14 +29,6 @@ export const SessionView = ({
   const { state: agentState, audioTrack } = useVoiceAssistant();
   const deepSearching = useDeepSearchStatus(session?.room);
   const [chatOpen, setChatOpen] = useState(true);
-
-  const controls: ControlBarControls = {
-    leave: true,
-    microphone: true,
-    chat: true, // PR3: テキスト入力欄を常時表示（表示制御のみ・permissionロジック不変）
-    camera: appConfig.supportsVideoInput,
-    screenShare: appConfig.supportsVideoInput,
-  };
 
   // 状態インジケータの優先度決定
   // isSpeaking > deepSearch > thinking（delta受信中はthinking非表示）
@@ -82,26 +71,15 @@ export const SessionView = ({
         )}
         <div className="bg-background relative mx-auto max-w-2xl pb-3 md:pb-12">
           <Fade bottom className="absolute inset-x-0 top-0 h-4 -translate-y-full" />
-          {(agentState === 'speaking' || agentState === 'listening') && (
-            <BarVisualizer
-              barCount={5}
-              state={agentState}
-              trackRef={audioTrack}
-              options={{ minHeight: 5 }}
-              className="mx-auto mb-2 flex h-6 items-center justify-center gap-1"
-            >
-              <span className="bg-muted min-h-2.5 w-1.5 origin-center rounded-full transition-colors duration-250 ease-linear data-[lk-highlighted=true]:bg-foreground data-[lk-muted=true]:bg-muted" />
-            </BarVisualizer>
-          )}
-          <div className="helix-controlbar">
-            <AgentControlBar
-              controls={controls}
-              isConnected={session.isConnected}
-              chatOpen={chatOpen}
-              onDisconnect={session.end}
-              onChatOpenChange={setChatOpen}
-            />
-          </div>
+          <SessionInputBar
+            appConfig={appConfig}
+            agentState={agentState}
+            audioTrack={audioTrack}
+            isConnected={session.isConnected}
+            chatOpen={chatOpen}
+            onDisconnect={session.end}
+            onChatOpenChange={setChatOpen}
+          />
         </div>
       </MotionBottom>
     </section>
