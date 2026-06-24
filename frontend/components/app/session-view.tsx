@@ -1,6 +1,5 @@
 'use client';
 import React, { useState } from 'react';
-import { motion } from 'motion/react';
 import { useSessionContext, useLocalParticipant, useIsSpeaking, useVoiceAssistant, BarVisualizer } from '@livekit/components-react';
 
 import { useHelixMessages } from '@/hooks/useHelixMessages';
@@ -9,6 +8,7 @@ import { useAutoScroll } from '@/hooks/useAutoScroll';
 import type { AppConfig } from '@/app-config';
 import { ChatTranscript, type StatusIndicator } from '@/components/app/chat-transcript';
 import { PreConnectMessage } from '@/components/app/preconnect-message';
+import { Fade, MotionBottom, BOTTOM_VIEW_MOTION_PROPS } from '@/components/app/fade';
 import {
   AgentControlBar,
   type ControlBarControls,
@@ -16,48 +16,6 @@ import {
 import { cn } from '@/lib/utils';
 import { deriveStatusIndicator } from '@/lib/status-indicator';
 import { ScrollArea } from '../livekit/scroll-area/scroll-area';
-
-const MotionBottom = motion.create('div');
-
-const BOTTOM_VIEW_MOTION_PROPS = {
-  variants: {
-    visible: {
-      opacity: 1,
-      translateY: '0%',
-    },
-    hidden: {
-      opacity: 0,
-      translateY: '100%',
-    },
-  },
-  initial: 'hidden',
-  animate: 'visible',
-  exit: 'hidden',
-  transition: {
-    duration: 0.3,
-    delay: 0.5,
-    ease: 'easeOut',
-  },
-};
-
-interface FadeProps {
-  top?: boolean;
-  bottom?: boolean;
-  className?: string;
-}
-
-export function Fade({ top = false, bottom = false, className }: FadeProps) {
-  return (
-    <div
-      className={cn(
-        'from-background pointer-events-none h-4 bg-linear-to-b to-transparent',
-        top && 'bg-linear-to-b',
-        bottom && 'bg-linear-to-t',
-        className
-      )}
-    />
-  );
-}
 
 interface SessionViewProps {
   appConfig: AppConfig;
