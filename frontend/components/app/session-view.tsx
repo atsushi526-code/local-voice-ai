@@ -14,6 +14,7 @@ import {
   type ControlBarControls,
 } from '@/components/livekit/agent-control-bar/agent-control-bar';
 import { cn } from '@/lib/utils';
+import { deriveStatusIndicator } from '@/lib/status-indicator';
 import { ScrollArea } from '../livekit/scroll-area/scroll-area';
 
 const MotionBottom = motion.create('div');
@@ -58,11 +59,6 @@ export function Fade({ top = false, bottom = false, className }: FadeProps) {
   );
 }
 
-// ── 状態インジケータ定義 ──
-const STATUS_LISTENING: StatusIndicator = { emoji: '🎤', text: '聞いています…' };
-const STATUS_SEARCHING: StatusIndicator = { emoji: '🔍', text: '検索しています…' };
-const STATUS_THINKING: StatusIndicator = { emoji: '💭', text: '回答を考えています…' };
-
 interface SessionViewProps {
   appConfig: AppConfig;
 }
@@ -89,12 +85,12 @@ export const SessionView = ({
 
   // 状態インジケータの優先度決定
   // isSpeaking > deepSearch > thinking（delta受信中はthinking非表示）
-  const statusIndicator: StatusIndicator | null = (() => {
-    if (isSpeaking) return STATUS_LISTENING;
-    if (deepSearching) return STATUS_SEARCHING;
-    if (agentState === 'thinking' && !streaming) return STATUS_THINKING;
-    return null;
-  })();
+  const statusIndicator: StatusIndicator | null = deriveStatusIndicator({
+    isSpeaking,
+    deepSearching,
+    agentState,
+    streaming,
+  });
 
   const scrollAreaRef = useAutoScroll(messages, statusIndicator);
 
