@@ -3,6 +3,7 @@
 import { AnimatePresence, type HTMLMotionProps, motion } from 'motion/react';
 import { ChatEntry } from '@/components/livekit/chat-entry';
 import type { HelixMessage } from '@/hooks/useHelixMessages';
+import type { StatusIndicator } from '@/lib/status-indicator';
 
 const MotionContainer = motion.create('div');
 const MotionChatEntry = motion.create(ChatEntry);
@@ -48,10 +49,7 @@ const MESSAGE_MOTION_PROPS = {
   },
 };
 
-export interface StatusIndicator {
-  emoji: string;
-  text: string;
-}
+export type { StatusIndicator };
 
 interface ChatTranscriptProps {
   hidden?: boolean;
