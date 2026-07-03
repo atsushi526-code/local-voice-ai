@@ -4,6 +4,7 @@ import { type HTMLAttributes, useCallback, useEffect, useRef, useState } from 'r
 import { Track } from 'livekit-client';
 import { useChat, useLocalParticipant, useRemoteParticipants, useRoomContext } from '@livekit/components-react';
 import { ChatTextIcon, MagnifyingGlassIcon, SpeakerSimpleXIcon, SpeakerSimpleHighIcon } from '@phosphor-icons/react/dist/ssr';
+import { useDeferredConnect } from '@/components/app/deferred-connect';
 import { TrackToggle } from '@/components/livekit/agent-control-bar/track-toggle';
 import { Button } from '@/components/livekit/button';
 import { Toggle } from '@/components/livekit/toggle';
@@ -193,7 +194,10 @@ export function AgentControlBar({
     handleCameraDeviceSelectError,
   } = useInputControls({ onDeviceError, saveUserChoices });
 
+  // PR-U1: 未接続なら接続完了を待ってから送信 (プリウォーム済なら実質待ちゼロ)。
+  const { ensureConnected, isConnected: dcConnected } = useDeferredConnect();
   const handleSendMessage = async (message: string) => {
+    await ensureConnected();
     await send(message);
   };
 
@@ -213,7 +217,8 @@ export function AgentControlBar({
     chat: controls?.chat ?? publishPermissions.data,
   };
 
-  const isAgentAvailable = participants.some((p) => p.isAgent);
+  // PR-U1: 未接続時 (agent 不在は当然) でも入力は有効 = 初回送信が接続トリガー。
+  const isAgentAvailable = participants.some((p) => p.isAgent) || !dcConnected;
 
   const deepSearchTitle =
     deepSearchMode === 'continuous' ? 'Deep Search 継続ON（長押しでOFF）' :
