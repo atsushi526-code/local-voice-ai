@@ -1,13 +1,12 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useSessionContext } from '@livekit/components-react';
 import type { AppConfig } from '@/app-config';
+import { DeferredConnectContext } from '@/components/app/deferred-connect';
 import { SessionView } from '@/components/app/session-view';
-import { WelcomeView } from '@/components/app/welcome-view';
 
-const MotionWelcomeView = motion.create(WelcomeView);
 const MotionSessionView = motion.create(SessionView);
 
 const VIEW_MOTION_PROPS = {
@@ -34,26 +33,34 @@ interface ViewControllerProps {
 
 export function ViewController({ appConfig }: ViewControllerProps) {
   const { isConnected, start } = useSessionContext();
+  // PR-U1: 遅延接続。in-flight Promise を共有し多重 start を単一接続へ収束。
+  const startingRef = useRef<Promise<void> | null>(null);
 
-  const handleStartCall = useCallback(() => {
-    start({ tracks: { microphone: { enabled: false } } });
-  }, [start]);
+  const ensureConnected = useCallback(async () => {
+    if (isConnected) return;
+    if (!startingRef.current) {
+      startingRef.current = Promise.resolve(
+        start({ tracks: { microphone: { enabled: false } } })
+      )
+        .then(() => undefined)
+        .finally(() => {
+          startingRef.current = null;
+        });
+    }
+    await startingRef.current;
+  }, [isConnected, start]);
 
+  const deferred = useMemo(
+    () => ({ ensureConnected, isConnected }),
+    [ensureConnected, isConnected]
+  );
+
+  // PR-U1: Welcome/Start call を廃止し、直接チャット画面 (UI 即時表示・接続は初回操作時)。
   return (
-    <AnimatePresence mode="wait">
-      {/* Welcome view */}
-      {!isConnected && (
-        <MotionWelcomeView
-          key="welcome"
-          {...VIEW_MOTION_PROPS}
-          startButtonText={appConfig.startButtonText}
-          onStartCall={handleStartCall}
-        />
-      )}
-      {/* Session view */}
-      {isConnected && (
+    <DeferredConnectContext.Provider value={deferred}>
+      <AnimatePresence mode="wait">
         <MotionSessionView key="session-view" {...VIEW_MOTION_PROPS} appConfig={appConfig} />
-      )}
-    </AnimatePresence>
+      </AnimatePresence>
+    </DeferredConnectContext.Provider>
   );
 }
