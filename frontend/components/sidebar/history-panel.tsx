@@ -61,7 +61,10 @@ export function HistoryPanel({ onSelectHistory }: { onSelectHistory?: (id: strin
     }
   }
 
-  async function deleteSession(id: string, title: string) {
+  // PR-U2: 削除UIは非表示 (backend の削除APIは温存)。再表示する場合はこの関数と
+  // 一覧の🗑️ボタン (git 履歴参照) を復元する。
+  /* eslint-disable @typescript-eslint/no-unused-vars */
+  async function _deleteSession(id: string, title: string) {
     if (!confirm(`「${title}」を削除しますか？この操作は元に戻せません。`)) return;
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/history/sessions/${id}`, {
@@ -74,6 +77,7 @@ export function HistoryPanel({ onSelectHistory }: { onSelectHistory?: (id: strin
       setError(e.message);
     }
   }
+  /* eslint-enable @typescript-eslint/no-unused-vars */
 
   return (
     <div className="p-3">
@@ -96,11 +100,11 @@ export function HistoryPanel({ onSelectHistory }: { onSelectHistory?: (id: strin
       ) : (
         <ul className="space-y-1">
           {sessions.map((s) => (
-            <li key={s.id} className="flex items-stretch gap-1">
+            <li key={s.id}>
               <button
                 type="button"
                 onClick={() => onSelectHistory?.(s.id)}
-                className="block min-w-0 flex-1 rounded border border-border px-2 py-1.5 text-left transition-colors hover:bg-muted"
+                className="block w-full min-w-0 rounded px-2 py-1.5 text-left transition-colors hover:bg-muted"
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate font-mono text-xs">{s.title}</span>
@@ -108,13 +112,6 @@ export function HistoryPanel({ onSelectHistory }: { onSelectHistory?: (id: strin
                     {formatDate(s.last_message_at)}
                   </span>
                 </div>
-              </button>
-              <button
-                onClick={() => deleteSession(s.id, s.title)}
-                aria-label="削除"
-                className="shrink-0 rounded border border-border px-1.5 text-xs text-muted-foreground transition-colors hover:border-red-400 hover:text-red-500"
-              >
-                🗑️
               </button>
             </li>
           ))}
