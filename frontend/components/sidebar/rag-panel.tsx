@@ -85,7 +85,9 @@ export function RagPanel() {
     }
   }
 
-  async function deleteDocument(id: string, filename: string) {
+  // PR-U2: 削除UIは非表示 (backend の削除APIは温存)。
+  /* eslint-disable @typescript-eslint/no-unused-vars */
+  async function _deleteDocument(id: string, filename: string) {
     if (!confirm(`「${filename}」を削除しますか？`)) return;
     try {
       await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rag/documents/${id}`, {
@@ -98,6 +100,7 @@ export function RagPanel() {
       setError(e.message);
     }
   }
+  /* eslint-enable @typescript-eslint/no-unused-vars */
 
   return (
     <div className="p-3">
@@ -141,18 +144,12 @@ export function RagPanel() {
           {documents.map((d) => (
             <li
               key={d.id}
-              className="flex items-center justify-between gap-2 rounded border border-border px-2 py-1.5"
+              className="flex items-center justify-between gap-2 rounded px-2 py-1.5 transition-colors hover:bg-muted"
             >
               <span className="min-w-0 truncate font-mono text-[11px]" title={d.filename}>
                 {d.filename}
                 <span className="ml-1 text-muted-foreground">{formatBytes(d.file_size)}</span>
               </span>
-              <button
-                onClick={() => deleteDocument(d.id, d.filename)}
-                className="shrink-0 font-mono text-[10px] text-red-500 underline underline-offset-2"
-              >
-                削除
-              </button>
             </li>
           ))}
         </ul>
