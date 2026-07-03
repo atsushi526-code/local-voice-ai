@@ -1,5 +1,6 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
+import { useDeferredConnect } from '@/components/app/deferred-connect';
 import { useSessionContext, useLocalParticipant, useIsSpeaking, useVoiceAssistant } from '@livekit/components-react';
 
 import { useHelixMessages } from '@/hooks/useHelixMessages';
@@ -23,6 +24,13 @@ export const SessionView = ({
   ...props
 }: React.ComponentProps<'section'> & SessionViewProps) => {
   const session = useSessionContext();
+  const { ensureConnected } = useDeferredConnect();
+
+  // PR-U1 プリウォーム: 初回の操作 (pointerdown / focus) で即時に接続を開始する。
+  // fire-and-forget (失敗は送信時の ensureConnected で再試行される)。
+  const prewarm = useCallback(() => {
+    void ensureConnected().catch(() => {});
+  }, [ensureConnected]);
   const { messages, streaming } = useHelixMessages(session?.room);
   const { localParticipant } = useLocalParticipant();
   const isSpeaking = useIsSpeaking(localParticipant);
@@ -42,7 +50,12 @@ export const SessionView = ({
   const scrollAreaRef = useAutoScroll(messages, statusIndicator);
 
   return (
-    <section className="bg-background relative z-10 h-full w-full overflow-hidden" {...props}>
+    <section
+      className="bg-background relative z-10 h-full w-full overflow-hidden"
+      onPointerDownCapture={prewarm}
+      onFocusCapture={prewarm}
+      {...props}
+    >
       {/* Chat Transcript */}
       <div
         className={cn(
