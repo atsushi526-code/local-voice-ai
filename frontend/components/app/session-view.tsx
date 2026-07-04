@@ -31,7 +31,7 @@ export const SessionView = ({
   const prewarm = useCallback(() => {
     void ensureConnected().catch(() => {});
   }, [ensureConnected]);
-  const { messages, streaming } = useHelixMessages(session?.room);
+  const { messages, streaming } = useHelixMessages(session?.room, ensureConnected);
   const { localParticipant } = useLocalParticipant();
   const isSpeaking = useIsSpeaking(localParticipant);
   const { state: agentState, audioTrack } = useVoiceAssistant();
