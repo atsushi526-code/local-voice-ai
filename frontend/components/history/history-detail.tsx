@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 
@@ -39,6 +39,10 @@ export function HistoryDetail({ sessionId, onClose }: HistoryDetailProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // PR-U4: resume実行中フラグ（連打防止）。resume_done or タイムアウト(10s) or 失敗で解除。
+  const [resuming, setResuming] = useState(false);
+  const [resumeError, setResumeError] = useState('');
+  const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (status !== 'authenticated' || sessionError || !accessToken || !sessionId) return;
@@ -67,6 +71,49 @@ export function HistoryDetail({ sessionId, onClose }: HistoryDetailProps) {
     };
   }, [accessToken, status, sessionError, sessionId]);
 
+  // PR-U4: resume完了/失敗の受信。done=オーバーレイを閉じる、fail/timeout=ボタン再有効化+表示。
+  useEffect(() => {
+    const clearTimer = () => {
+      if (resumeTimerRef.current) {
+        clearTimeout(resumeTimerRef.current);
+        resumeTimerRef.current = null;
+      }
+    };
+    const onDone = () => {
+      clearTimer();
+      setResuming(false);
+      onClose?.();
+    };
+    const onFail = () => {
+      clearTimer();
+      setResuming(false);
+      setResumeError('再開に失敗しました。接続を確認して再試行してください。');
+    };
+    window.addEventListener('helix:resume-done', onDone);
+    window.addEventListener('helix:resume-fail', onFail);
+    return () => {
+      clearTimer();
+      window.removeEventListener('helix:resume-done', onDone);
+      window.removeEventListener('helix:resume-fail', onFail);
+    };
+  }, [onClose]);
+
+  const handleResume = () => {
+    if (resuming || loading || !meta) return;
+    setResumeError('');
+    setResuming(true);
+    window.dispatchEvent(
+      new CustomEvent('helix:resume', {
+        detail: { sessionId, messages },
+      })
+    );
+    // resume_done未達タイムアウト（fail-open: ボタン再有効化のみ・素のchatとして継続可能）
+    resumeTimerRef.current = setTimeout(() => {
+      setResuming(false);
+      setResumeError('応答がありません。もう一度お試しください。');
+    }, 10000);
+  };
+
   return (
     <div className="mx-auto max-w-3xl">
       <div className="mb-6 flex items-start justify-between gap-3">
@@ -90,12 +137,16 @@ export function HistoryDetail({ sessionId, onClose }: HistoryDetailProps) {
           {onClose && (
             <button
               type="button"
-              disabled
-              aria-disabled="true"
-              title="準備中"
-              className="cursor-not-allowed rounded border border-border px-2 py-1 font-mono text-xs text-muted-foreground opacity-60"
+              onClick={handleResume}
+              disabled={resuming || loading}
+              aria-disabled={resuming || loading}
+              className={
+                resuming || loading
+                  ? 'cursor-not-allowed rounded border border-border px-2 py-1 font-mono text-xs text-muted-foreground opacity-60'
+                  : 'rounded border border-border px-2 py-1 font-mono text-xs hover:bg-muted'
+              }
             >
-              会話を再開（準備中）
+              {resuming ? '再開中…' : '会話を再開'}
             </button>
           )}
           {meta && (
@@ -112,6 +163,12 @@ export function HistoryDetail({ sessionId, onClose }: HistoryDetailProps) {
       {error && (
         <div className="mb-4 rounded border border-red-500 bg-red-50 p-3 font-mono text-xs text-red-700">
           {error}
+        </div>
+      )}
+
+      {resumeError && (
+        <div className="mb-4 rounded border border-amber-500 bg-amber-50 p-3 font-mono text-xs text-amber-700">
+          {resumeError}
         </div>
       )}
 

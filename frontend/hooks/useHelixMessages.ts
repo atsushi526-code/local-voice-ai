@@ -24,7 +24,10 @@ const CONTROL_TOPIC = 'helix.control';
  * deltaはseq順に結合してidベースupsert、finalは800B分割を再結合して全文置換する。
  * userはfinalのみ表示。interim/transcription表示は廃止済み。
  */
-export function useHelixMessages(room?: Room): {
+export function useHelixMessages(
+  room?: Room,
+  ensureConnected?: () => Promise<void>
+): {
   messages: HelixMessage[];
   streaming: boolean; // delta受信中（未finalized assistant有り）
 } {
@@ -132,6 +135,11 @@ export function useHelixMessages(room?: Room): {
         const msg = JSON.parse(raw) as { type?: string };
         if (msg.type === 'reset_done') {
           clearConversation();
+        } else if (msg.type === 'resume_done') {
+          // PR-U4: resume完了。表示は helix:resume 受理時に過去ログで初期化済み（クリアしない）。
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('helix:resume-done'));
+          }
         }
       } catch (e) {
         console.error('helix.control parse failed:', e);
@@ -144,11 +152,50 @@ export function useHelixMessages(room?: Room): {
       window.addEventListener('helix:new-chat', onNewChat);
     }
 
+    // ── PR-U4 履歴resume: HistoryDetailからdispatch。過去ログで表示初期化 → resume_session送信 ──
+    // 新session+過去コンテキスト注入（agent側PR-U3）。resume_doneはCONTROL_TOPICで受信。
+    const onResume = async (e: Event) => {
+      const detail = (e as CustomEvent).detail as
+        | { sessionId?: string; messages?: { id: string; role: string; content: string; created_at: string }[] }
+        | undefined;
+      const sid = detail?.sessionId;
+      if (!sid) return;
+      // 表示初期化: フロント取得済みの過去messagesを使用（agentからは送り返さない=2KB制限回避）
+      clearConversation();
+      const past = (detail?.messages ?? [])
+        .filter((m) => m.role === 'user' || m.role === 'assistant')
+        .map((m) => ({
+          id: `hist_${m.id}`,
+          role: m.role as 'user' | 'assistant',
+          text: m.content,
+          ts: new Date(m.created_at).getTime(),
+          kind: 'final' as const,
+          finalized: true,
+        }));
+      setMessages(past);
+      try {
+        if (ensureConnected) await ensureConnected();
+        const payload = new TextEncoder().encode(
+          JSON.stringify({ type: 'resume_session', session_id: sid })
+        );
+        await room.localParticipant.publishData(payload, { reliable: true });
+      } catch (err) {
+        console.error('resume_session publish failed:', err);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('helix:resume-fail'));
+        }
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('helix:resume', onResume);
+    }
+
     room.registerTextStreamHandler(TOPIC, handler);
     room.registerTextStreamHandler(CONTROL_TOPIC, controlHandler);
     return () => {
       if (typeof window !== 'undefined') {
         window.removeEventListener('helix:new-chat', onNewChat);
+        window.removeEventListener('helix:resume', onResume);
       }
       try {
         room.unregisterTextStreamHandler(TOPIC);
@@ -161,7 +208,7 @@ export function useHelixMessages(room?: Room): {
         /* already unregistered */
       }
     };
-  }, [room]);
+  }, [room, ensureConnected]);
 
   return { messages, streaming };
 }
