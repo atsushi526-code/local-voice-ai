@@ -31,7 +31,7 @@ export const SessionView = ({
   const prewarm = useCallback(() => {
     void ensureConnected().catch(() => {});
   }, [ensureConnected]);
-  const { messages, streaming } = useHelixMessages(session?.room, ensureConnected);
+  const { messages, streaming, omTask } = useHelixMessages(session?.room, ensureConnected);
   const { localParticipant } = useLocalParticipant();
   const isSpeaking = useIsSpeaking(localParticipant);
   const { state: agentState, audioTrack } = useVoiceAssistant();
@@ -56,6 +56,27 @@ export const SessionView = ({
       onFocusCapture={prewarm}
       {...props}
     >
+      {/* Phase3: OpenManus タスク実行中バッジ + 停止ボタン（最小表示） */}
+      {omTask && (omTask.phase === 'accepted' || omTask.phase === 'running') && (
+        <div className="pointer-events-auto fixed inset-x-0 top-3 z-30 flex justify-center">
+          <div className="bg-muted/90 text-foreground flex items-center gap-3 rounded-full px-4 py-1.5 text-sm shadow-md backdrop-blur">
+            <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-amber-500" />
+            <span>タスク実行中…</span>
+            <button
+              type="button"
+              className="text-destructive hover:underline"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(new CustomEvent('helix:om-stop'));
+                }
+              }}
+            >
+              停止
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Chat Transcript */}
       <div
         className={cn(

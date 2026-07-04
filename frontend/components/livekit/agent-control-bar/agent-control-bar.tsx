@@ -197,6 +197,15 @@ export function AgentControlBar({
   // PR-U1: 未接続なら接続完了を待ってから送信 (プリウォーム済なら実質待ちゼロ)。
   const { ensureConnected, isConnected: dcConnected } = useDeferredConnect();
   const handleSendMessage = async (message: string) => {
+    // Phase3(案b): "/om " 接頭辞は OpenManus タスクへルーティング（それ以外は通常チャット）。
+    const trimmed = message.trimStart();
+    if (trimmed.toLowerCase().startsWith('/om ')) {
+      const prompt = trimmed.slice(4).trim();
+      if (prompt && typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('helix:om-task', { detail: { prompt } }));
+      }
+      return;
+    }
     await ensureConnected();
     await send(message);
   };

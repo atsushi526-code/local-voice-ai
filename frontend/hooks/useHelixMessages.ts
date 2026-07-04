@@ -18,6 +18,13 @@ export interface HelixMessage {
 const TOPIC = 'helix.chat';
 const CONTROL_TOPIC = 'helix.control';
 
+export type OmPhase = 'accepted' | 'running' | 'done' | 'error';
+export interface OmTaskState {
+  taskId: string;
+  phase: OmPhase;
+  detail?: string;
+}
+
 /**
  * 統一メッセージストリーム(helix.chat)の購読。
  * assistantは同一msg_idでdelta(差分逐次)→final(確定全文置換)を受信する。
@@ -30,9 +37,15 @@ export function useHelixMessages(
 ): {
   messages: HelixMessage[];
   streaming: boolean; // delta受信中（未finalized assistant有り）
+  omTask: OmTaskState | null; // OpenManus タスクの実行状態（Phase3）
 } {
   const [messages, setMessages] = useState<HelixMessage[]>([]);
   const [streaming, setStreaming] = useState(false);
+  const [omTask, setOmTask] = useState<OmTaskState | null>(null);
+  const omTaskRef = useRef<OmTaskState | null>(null);
+  useEffect(() => {
+    omTaskRef.current = omTask;
+  }, [omTask]);
   const partsBufRef = useRef<Map<string, Map<number, string>>>(new Map());
   // delta結合用: id -> (seq -> text)。seq順に連結して逐次表示する。
   const deltaBufRef = useRef<Map<string, Map<number, string>>>(new Map());
@@ -140,6 +153,12 @@ export function useHelixMessages(
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('helix:resume-done'));
           }
+        } else if (msg.type === 'om_status') {
+          // Phase3: OpenManus タスク状態。helix.control=正。UIは実行中バッジ/停止ボタンに反映。
+          const m2 = msg as { type?: string; task_id?: string; phase?: OmPhase; detail?: string };
+          if (m2.task_id && m2.phase) {
+            setOmTask({ taskId: m2.task_id, phase: m2.phase, detail: m2.detail });
+          }
         }
       } catch (e) {
         console.error('helix.control parse failed:', e);
@@ -190,12 +209,55 @@ export function useHelixMessages(
       window.addEventListener('helix:resume', onResume);
     }
 
+    // ── Phase3: OpenManus タスク起動（helix:om-task dispatch → om_task publishData） ──
+    const onOmTask = async (e: Event) => {
+      const detail = (e as CustomEvent).detail as { prompt?: string } | undefined;
+      const prompt = (detail?.prompt ?? '').trim();
+      if (!prompt) return;
+      const taskId =
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `om_${Date.now()}`;
+      // 楽観的に accepted 表示（agentからのom_status accepted で確定・上書き）
+      setOmTask({ taskId, phase: 'accepted' });
+      try {
+        if (ensureConnected) await ensureConnected();
+        const payload = new TextEncoder().encode(
+          JSON.stringify({ type: 'om_task', task_id: taskId, prompt })
+        );
+        await room.localParticipant.publishData(payload, { reliable: true });
+      } catch (err) {
+        console.error('om_task publish failed:', err);
+        setOmTask({ taskId, phase: 'error', detail: 'publish_failed' });
+      }
+    };
+
+    // ── Phase3: OpenManus タスク停止（helix:om-stop → om_stop publishData → agentがom_stop作成） ──
+    const onOmStop = async () => {
+      const cur = omTaskRef.current;
+      if (!cur || (cur.phase !== 'accepted' && cur.phase !== 'running')) return;
+      try {
+        const payload = new TextEncoder().encode(
+          JSON.stringify({ type: 'om_stop', task_id: cur.taskId })
+        );
+        await room.localParticipant.publishData(payload, { reliable: true });
+      } catch (err) {
+        console.error('om_stop publish failed:', err);
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('helix:om-task', onOmTask);
+      window.addEventListener('helix:om-stop', onOmStop);
+    }
+
     room.registerTextStreamHandler(TOPIC, handler);
     room.registerTextStreamHandler(CONTROL_TOPIC, controlHandler);
     return () => {
       if (typeof window !== 'undefined') {
         window.removeEventListener('helix:new-chat', onNewChat);
         window.removeEventListener('helix:resume', onResume);
+        window.removeEventListener('helix:om-task', onOmTask);
+        window.removeEventListener('helix:om-stop', onOmStop);
       }
       try {
         room.unregisterTextStreamHandler(TOPIC);
@@ -210,5 +272,5 @@ export function useHelixMessages(
     };
   }, [room, ensureConnected]);
 
-  return { messages, streaming };
+  return { messages, streaming, omTask };
 }
